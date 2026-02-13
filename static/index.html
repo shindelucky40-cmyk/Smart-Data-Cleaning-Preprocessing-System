@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Data Cleaning &amp; Preprocessing System</title>
+  <meta name="description"
+    content="Upload raw data files, detect quality issues, clean &amp; preprocess for ML, and download a cleaned dataset — all in one place." />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+
+<body>
+
+  <div class="app-container">
+
+    <!-- ========== Header ========== -->
+    <header class="app-header">
+      <h1>✨ Smart Data Cleaning</h1>
+      <p>Upload · Detect · Clean · Download — ready for ML in minutes</p>
+    </header>
+
+    <!-- ========== Steps bar ========== -->
+    <nav class="steps-bar" id="steps-bar">
+      <div class="step-pill active" data-step="upload">
+        <span class="step-num">1</span> Upload
+      </div>
+      <span class="step-connector" id="conn-1"></span>
+      <div class="step-pill" data-step="preview">
+        <span class="step-num">2</span> Preview
+      </div>
+      <span class="step-connector" id="conn-2"></span>
+      <div class="step-pill" data-step="options">
+        <span class="step-num">3</span> Configure
+      </div>
+      <span class="step-connector" id="conn-3"></span>
+      <div class="step-pill" data-step="results">
+        <span class="step-num">4</span> Results
+      </div>
+    </nav>
+
+    <!-- ========== Screen 1 — Upload ========== -->
+    <section class="screen active" id="screen-upload">
+      <div class="glass-card">
+        <div class="upload-zone" id="upload-zone">
+          <span class="upload-icon">📂</span>
+          <h2>Drop your dataset here</h2>
+          <p>or click to browse files</p>
+          <div class="file-types">
+            <span class="file-type-badge">.csv</span>
+            <span class="file-type-badge">.xlsx</span>
+            <span class="file-type-badge">.xls</span>
+            <span class="file-type-badge">.json</span>
+          </div>
+          <input type="file" id="file-input" accept=".csv,.xls,.xlsx,.json" />
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== Screen 2 — Preview ========== -->
+    <section class="screen" id="screen-preview">
+      <div class="glass-card">
+        <div class="preview-header">
+          <h2>📊 Data Preview</h2>
+          <span class="file-badge" id="filename-badge"></span>
+        </div>
+
+        <div class="stats-row" id="stats-row"></div>
+
+        <div class="issues-panel">
+          <h3>⚠️ Detected Issues</h3>
+          <div class="issue-list" id="issue-list"></div>
+        </div>
+
+        <h3 class="section-title">📋 Raw Data <span
+            style="font-weight:400; color: var(--text-muted); font-size: 0.78rem;">(first 100 rows)</span></h3>
+        <div class="table-wrap">
+          <table class="data-table" id="preview-table">
+            <thead id="preview-thead"></thead>
+            <tbody id="preview-tbody"></tbody>
+          </table>
+        </div>
+
+        <div class="btn-row" style="margin-top:1.25rem;">
+          <button class="btn btn-secondary" onclick="showScreen('upload')">← Back</button>
+          <button class="btn btn-primary" onclick="showScreen('options')">Configure Cleaning →</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== Screen 3 — Options ========== -->
+    <section class="screen" id="screen-options">
+      <div class="glass-card">
+        <h2 style="margin-bottom:1.25rem; font-weight:700;">⚙️ Cleaning &amp; Preprocessing Options</h2>
+
+        <div class="options-grid">
+
+          <!-- Cleaning options -->
+          <div class="option-group">
+            <h3><span>🧹</span> Data Cleaning</h3>
+
+            <div class="option-row">
+              <div class="option-label"><strong>Missing Values</strong></div>
+              <select class="custom-select" id="opt-missing">
+                <option value="">Skip</option>
+                <option value="mean">Fill with Mean</option>
+                <option value="median">Fill with Median</option>
+                <option value="mode">Fill with Mode</option>
+                <option value="drop">Drop Rows</option>
+              </select>
+            </div>
+
+            <div class="option-row">
+              <div class="option-label"><strong>Remove Duplicates</strong></div>
+              <label class="toggle"><input type="checkbox" id="opt-duplicates" /><span
+                  class="toggle-slider"></span></label>
+            </div>
+
+            <div class="option-row">
+              <div class="option-label"><strong>Trim Whitespace</strong></div>
+              <label class="toggle"><input type="checkbox" id="opt-whitespace" /><span
+                  class="toggle-slider"></span></label>
+            </div>
+
+            <div class="option-row">
+              <div class="option-label"><strong>Outliers</strong></div>
+              <select class="custom-select" id="opt-outliers">
+                <option value="">Skip</option>
+                <option value="cap">Cap (IQR)</option>
+                <option value="remove">Remove</option>
+              </select>
+            </div>
+
+            <div class="option-row">
+              <div class="option-label"><strong>Constant Columns</strong></div>
+              <label class="toggle"><input type="checkbox" id="opt-constant" /><span
+                  class="toggle-slider"></span></label>
+            </div>
+          </div>
+
+          <!-- Preprocessing options -->
+          <div class="option-group">
+            <h3><span>🔬</span> Preprocessing</h3>
+
+            <div class="option-row">
+              <div class="option-label"><strong>Encode Categoricals</strong></div>
+              <select class="custom-select" id="opt-encode">
+                <option value="">Skip</option>
+                <option value="label">Label Encoding</option>
+                <option value="onehot">One-Hot Encoding</option>
+              </select>
+            </div>
+
+            <div class="option-row">
+              <div class="option-label"><strong>Scale Numerics</strong></div>
+              <select class="custom-select" id="opt-scale">
+                <option value="">Skip</option>
+                <option value="standard">Standard Scaler</option>
+                <option value="minmax">Min-Max Scaler</option>
+              </select>
+            </div>
+
+            <div class="option-row">
+              <div class="option-label"><strong>Extract Datetime</strong></div>
+              <label class="toggle"><input type="checkbox" id="opt-datetime" /><span
+                  class="toggle-slider"></span></label>
+            </div>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-secondary" onclick="showScreen('preview')">← Back</button>
+          <button class="btn btn-success" id="btn-run-clean">🚀 Run Cleaning</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== Screen 4 — Results ========== -->
+    <section class="screen" id="screen-results">
+      <div class="glass-card">
+        <h2 style="margin-bottom:1.25rem; font-weight:700;">📈 Results &amp; Change Report</h2>
+
+        <div class="results-summary" id="results-summary"></div>
+
+        <h3 class="section-title">🔄 Changes Applied</h3>
+        <div class="change-list" id="change-list"></div>
+
+        <h3 class="section-title">📋 Cleaned Data Preview</h3>
+        <div class="table-wrap">
+          <table class="data-table" id="results-table">
+            <thead id="results-thead"></thead>
+            <tbody id="results-tbody"></tbody>
+          </table>
+        </div>
+
+        <div class="download-section">
+          <div class="format-select">
+            <span>Format:</span>
+            <select class="custom-select" id="download-format">
+              <option value="csv">CSV</option>
+              <option value="xlsx">Excel</option>
+              <option value="json">JSON</option>
+            </select>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-secondary" onclick="showScreen('options')">← Back</button>
+            <button class="btn btn-success" id="btn-download">⬇️ Download Cleaned Data</button>
+            <button class="btn btn-primary" onclick="resetApp()">🔄 New File</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Loading overlay -->
+  <div class="loading-overlay" id="loading">
+    <div class="spinner"></div>
+    <p id="loading-text">Processing…</p>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+
+</html>
