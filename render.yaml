@@ -1,9 +1,7 @@
 services:
   - type: web
-    name: smart-data-cleaner
+    name: smart-data-cleaning
     env: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn app:app -w 1 --threads 4"
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.0
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py

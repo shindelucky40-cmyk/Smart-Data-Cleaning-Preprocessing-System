@@ -50,7 +50,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # ---------- Page ----------
 @app.route("/")
-def index():
+def home():
     return send_from_directory("static", "index.html")
 
 
@@ -172,4 +172,5 @@ def visualize():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
