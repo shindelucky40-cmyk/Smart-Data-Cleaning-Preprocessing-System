@@ -63,6 +63,13 @@ function resetApp() {
   document.getElementById('opt-encode').value = '';
   document.getElementById('opt-scale').value = '';
   document.getElementById('opt-datetime').checked = false;
+  document.getElementById('opt-log').checked = false;
+  document.getElementById('opt-text').checked = false;
+  if (window.appCharts) {
+    window.appCharts.forEach(c => c.destroy());
+    window.appCharts = [];
+  }
+  document.getElementById('vis-container').innerHTML = '';
   showScreen('upload');
   showToast('Ready for a new file!', 'success');
 }
@@ -141,6 +148,13 @@ async function handleFile(file) {
 
     sessionId = data.session_id;
     renderPreview(data);
+
+    // Fetch visualizations
+    fetch(`/api/visualize?session_id=${sessionId}&type=raw`)
+      .then(res => res.json())
+      .then(visData => renderCharts(visData))
+      .catch(e => console.error("Could not load charts:", e));
+
     hideLoading();
 
     // Brief pause before showing preview so loading fade-out completes
@@ -222,6 +236,8 @@ async function runCleaning() {
     encode_categorical: val('opt-encode'),
     scale_numeric: val('opt-scale'),
     extract_datetime: checked('opt-datetime'),
+    log_transform: checked('opt-log'),
+    text_cleaning: checked('opt-text'),
   };
 
   showLoading('Cleaning & preprocessing your data…');
@@ -357,4 +373,90 @@ function formatSample(sample) {
       + (sample.length > 5 ? ', …' : '');
   }
   return escHtml(String(sample));
+}
+
+// ---------- Chart.js Rendering ----------
+window.appCharts = [];
+
+function renderCharts(visData) {
+  const container = document.getElementById('vis-container');
+  container.innerHTML = '';
+
+  if (window.appCharts) {
+    window.appCharts.forEach(c => c.destroy());
+    window.appCharts = [];
+  }
+
+  // Helper to create a canvas wrapper
+  function createCanvasWrapper(title) {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = "background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 12px; width: calc(50% - 0.5rem); min-width: 300px; height: 350px; display: flex; flex-direction: column; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.1);";
+    const h4 = document.createElement('h4');
+    h4.textContent = title;
+    h4.style.marginBottom = "0.5rem";
+    h4.style.fontSize = "0.9rem";
+    h4.style.flexShrink = "0";
+    wrap.appendChild(h4);
+
+    const innerWrap = document.createElement('div');
+    innerWrap.style.position = "relative";
+    innerWrap.style.flexGrow = "1";
+    innerWrap.style.minHeight = "0"; // Prevents flex child from overflowing
+
+    const canvas = document.createElement('canvas');
+    innerWrap.appendChild(canvas);
+    wrap.appendChild(innerWrap);
+    container.appendChild(wrap);
+    return canvas.getContext('2d');
+  }
+
+  Chart.defaults.color = "rgba(255,255,255,0.7)";
+
+  // Plot numerical histograms
+  if (visData.histograms) {
+    for (const [col, data] of Object.entries(visData.histograms)) {
+      if (data.counts && data.counts.length) {
+        const ctx = createCanvasWrapper(`Distribution: ${col}`);
+        const chart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: data.bins.map(b => Number(b).toFixed(2)),
+            datasets: [{
+              label: 'Frequency',
+              data: data.counts,
+              backgroundColor: 'rgba(99, 102, 241, 0.7)',
+              borderColor: 'rgba(99, 102, 241, 1)',
+              borderWidth: 1
+            }]
+          },
+          options: { responsive: true, maintainAspectRatio: false, scales: { x: { display: false } } }
+        });
+        window.appCharts.push(chart);
+      }
+    }
+  }
+
+  // Plot categorical bar charts
+  if (visData.bar_charts) {
+    for (const [col, data] of Object.entries(visData.bar_charts)) {
+      if (data.counts && data.counts.length) {
+        const ctx = createCanvasWrapper(`Top Categories: ${col}`);
+        const chart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: data.labels,
+            datasets: [{
+              label: 'Count',
+              data: data.counts,
+              backgroundColor: 'rgba(16, 185, 129, 0.7)',
+              borderColor: 'rgba(16, 185, 129, 1)',
+              borderWidth: 1
+            }]
+          },
+          options: { responsive: true, maintainAspectRatio: false }
+        });
+        window.appCharts.push(chart);
+      }
+    }
+  }
 }

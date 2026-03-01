@@ -8,6 +8,7 @@
   <meta name="description"
     content="Upload raw data files, detect quality issues, clean &amp; preprocess for ML, and download a cleaned dataset — all in one place." />
   <link rel="stylesheet" href="/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
@@ -72,6 +73,11 @@
           <div class="issue-list" id="issue-list"></div>
         </div>
 
+        <h3 class="section-title">📈 Data Visualizations</h3>
+        <div id="vis-container" style="display:flex; flex-wrap:wrap; gap:1rem; margin-bottom: 2rem;">
+          <!-- Charts will be injected here -->
+        </div>
+
         <h3 class="section-title">📋 Raw Data <span
             style="font-weight:400; color: var(--text-muted); font-size: 0.78rem;">(first 100 rows)</span></h3>
         <div class="table-wrap">
@@ -106,6 +112,7 @@
                 <option value="mean">Fill with Mean</option>
                 <option value="median">Fill with Median</option>
                 <option value="mode">Fill with Mode</option>
+                <option value="knn">KNN Imputation (Numeric)</option>
                 <option value="drop">Drop Rows</option>
               </select>
             </div>
@@ -136,6 +143,12 @@
               <label class="toggle"><input type="checkbox" id="opt-constant" /><span
                   class="toggle-slider"></span></label>
             </div>
+            
+            <div class="option-row">
+              <div class="option-label"><strong>Clean Text Data</strong></div>
+              <label class="toggle"><input type="checkbox" id="opt-text" /><span
+                  class="toggle-slider"></span></label>
+            </div>
           </div>
 
           <!-- Preprocessing options -->
@@ -163,6 +176,12 @@
             <div class="option-row">
               <div class="option-label"><strong>Extract Datetime</strong></div>
               <label class="toggle"><input type="checkbox" id="opt-datetime" /><span
+                  class="toggle-slider"></span></label>
+            </div>
+            
+            <div class="option-row">
+              <div class="option-label"><strong>Log Transform (Log1p)</strong></div>
+              <label class="toggle"><input type="checkbox" id="opt-log" /><span
                   class="toggle-slider"></span></label>
             </div>
           </div>

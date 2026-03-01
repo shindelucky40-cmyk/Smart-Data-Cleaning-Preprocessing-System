@@ -8,6 +8,8 @@ import io
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder, StandardScaler, MinMaxScaler
+from sklearn.impute import KNNImputer
+import chardet
 
 
 # ---------------------------------------------------------------------------
@@ -168,19 +170,28 @@ def clean_dataframe(df: pd.DataFrame, options: dict) -> tuple[pd.DataFrame, list
                 mode_vals = df[col].mode()
                 if not mode_vals.empty:
                     df[col] = df[col].fillna(mode_vals.iloc[0])
+            elif strategy == "knn" and pd.api.types.is_numeric_dtype(df[col]):
+                imputer = KNNImputer(n_neighbors=5)
+                # Apply KNN only to numeric columns, and we have to impute all missing numerics collectively for context
+                # To simplify, we'll impute this specific column using the other numeric columns as context
+                num_cols = df.select_dtypes(include="number").columns
+                if len(num_cols) > 0:
+                    df[num_cols] = imputer.fit_transform(df[num_cols])
             else:
-                # Non-numeric with mean/median → fallback to mode
+                # Non-numeric with mean/median/knn → fallback to mode
                 mode_vals = df[col].mode()
                 if not mode_vals.empty:
                     df[col] = df[col].fillna(mode_vals.iloc[0])
 
-            changes.append({
-                "operation": f"fill_missing ({strategy})",
-                "column": col,
-                "rows_affected": n_miss,
-                "before_sample": before_sample,
-                "after_sample": df[col].head(5).tolist(),
-            })
+            # Re-check to avoid KeyError if strategy was drop and no rows left
+            if col in df.columns:
+                changes.append({
+                    "operation": f"fill_missing ({strategy})",
+                    "column": col,
+                    "rows_affected": n_miss,
+                    "before_sample": before_sample,
+                    "after_sample": df[col].head(5).tolist(),
+                })
 
     # 4. Handle outliers
     outlier_strategy = options.get("handle_outliers")
@@ -242,6 +253,8 @@ def preprocess_dataframe(df: pd.DataFrame, options: dict) -> tuple[pd.DataFrame,
         encode_categorical : 'label' | 'onehot' | None
         scale_numeric : 'standard' | 'minmax' | None
         extract_datetime : bool
+        log_transform : bool
+        text_cleaning : bool
     """
     df = df.copy()
     changes: list[dict] = []
@@ -333,6 +346,37 @@ def preprocess_dataframe(df: pd.DataFrame, options: dict) -> tuple[pd.DataFrame,
                 "before_sample": before_sample,
                 "after_sample": after_sample,
             })
+            
+    # 4. Log Transformation
+    if options.get("log_transform"):
+        num_cols = df.select_dtypes(include="number").columns.tolist()
+        for col in num_cols:
+            # Only apply to positively skewed and mostly positive data to simplify
+            if df[col].min() >= 0 and df[col].skew() > 1:
+                before_sample = df[col].head(5).tolist()
+                df[col] = np.log1p(df[col])
+                changes.append({
+                    "operation": "log_transform",
+                    "column": col,
+                    "rows_affected": len(df),
+                    "before_sample": before_sample,
+                    "after_sample": df[col].head(5).tolist(),
+                })
+                
+    # 5. Text Cleaning
+    if options.get("text_cleaning"):
+        cat_cols = df.select_dtypes(include=["object"]).columns.tolist()
+        for col in cat_cols:
+            before_sample = df[col].dropna().head(3).tolist()
+            # Lowercase and remove punctuation conceptually (simplified to lowercase and strip special chars)
+            df[col] = df[col].astype(str).str.lower().str.replace(r'[^\w\s]+', '', regex=True).replace('nan', np.nan)
+            changes.append({
+                "operation": "text_cleaning",
+                "column": col,
+                "rows_affected": len(df),
+                "before_sample": before_sample,
+                "after_sample": df[col].dropna().head(3).tolist(),
+            })
 
     return df, changes
 
@@ -342,14 +386,35 @@ def preprocess_dataframe(df: pd.DataFrame, options: dict) -> tuple[pd.DataFrame,
 # ---------------------------------------------------------------------------
 
 def read_file(file_storage, filename: str) -> pd.DataFrame:
-    """Read an uploaded file into a DataFrame."""
+    """Read an uploaded file into a DataFrame robustly."""
     ext = filename.rsplit(".", 1)[-1].lower()
-    if ext == "csv":
-        return pd.read_csv(file_storage)
+    
+    # Read the bytes into memory for robust processing
+    raw_data = file_storage.read()
+    file_storage.seek(0)
+    
+    if ext == "csv" or ext == "tsv":
+        # Detect encoding
+        detected = chardet.detect(raw_data)
+        encoding = detected.get("encoding", "utf-8")
+        
+        # Determine separator
+        sep = "\t" if ext == "tsv" else ","
+        try:
+            return pd.read_csv(io.BytesIO(raw_data), encoding=encoding, sep=sep, on_bad_lines='skip', engine='python')
+        except Exception:
+            # Fallback if engine fails
+            file_storage.seek(0)
+            return pd.read_csv(file_storage, on_bad_lines='skip', encoding='utf-8', errors='ignore')
+
     elif ext in ("xls", "xlsx"):
-        return pd.read_excel(file_storage, engine="openpyxl")
+        return pd.read_excel(io.BytesIO(raw_data), engine="openpyxl")
     elif ext == "json":
-        return pd.read_json(file_storage)
+        return pd.read_json(io.BytesIO(raw_data))
+    elif ext == "parquet":
+        return pd.read_parquet(io.BytesIO(raw_data))
+    elif ext == "xml":
+        return pd.read_xml(io.BytesIO(raw_data))
     else:
         raise ValueError(f"Unsupported file type: .{ext}")
 
@@ -397,3 +462,45 @@ def df_preview(df: pd.DataFrame, max_rows: int = 100) -> list[dict]:
     for col in preview_df.columns:
         preview_df[col] = preview_df[col].apply(_safe_convert)
     return preview_df.to_dict(orient="records")
+
+def get_visualization_data(df: pd.DataFrame) -> dict:
+    """Generate summary data for frontend visualization (charts)."""
+    vis_data = {
+        "histograms": {},
+        "bar_charts": {},
+        "correlation": None
+    }
+    
+    # Histograms for numerical data
+    num_cols = df.select_dtypes(include="number").columns
+    for col in num_cols:
+        # Compute histogram with 20 bins, ignoring NaNs
+        cleaned_col = df[col].dropna()
+        if len(cleaned_col) == 0:
+            continue
+        counts, bins = np.histogram(cleaned_col, bins=20)
+        vis_data["histograms"][col] = {
+            "bins": [_safe_convert(b) for b in bins[:-1]], 
+            "counts": [_safe_convert(c) for c in counts]
+        }
+        
+    # Bar charts for top 10 categories in categorical data
+    cat_cols = df.select_dtypes(exclude="number").columns
+    for col in cat_cols:
+        val_counts = df[col].value_counts().head(10)
+        if len(val_counts) == 0:
+            continue
+        vis_data["bar_charts"][col] = {
+            "labels": [_safe_convert(idx) for idx in val_counts.index],
+            "counts": [_safe_convert(c) for c in val_counts.values]
+        }
+        
+    # Correlation Matrix Wrapper (only for top 15 numeric columns to avoid oversized payload)
+    if len(num_cols) > 1:
+        corr_matrix = df[num_cols[:15]].corr().fillna(0).round(2)
+        vis_data["correlation"] = {
+            "columns": corr_matrix.columns.tolist(),
+            "values": corr_matrix.values.tolist()
+        }
+
+    return vis_data

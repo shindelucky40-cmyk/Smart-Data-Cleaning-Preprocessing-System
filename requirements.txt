@@ -3,3 +3,7 @@ pandas
 numpy
 scikit-learn
 openpyxl
+chardet
+pyarrow
+lxml
+gunicorn

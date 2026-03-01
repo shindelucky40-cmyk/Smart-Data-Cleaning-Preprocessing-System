@@ -16,6 +16,7 @@ from data_processor import (
     preprocess_dataframe,
     df_preview,
     df_to_download_bytes,
+    get_visualization_data,
 )
 import pandas as pd
 
@@ -105,6 +106,8 @@ def clean():
         "encode_categorical": body.get("encode_categorical"),   # label|onehot|null
         "scale_numeric": body.get("scale_numeric"),             # standard|minmax|null
         "extract_datetime": body.get("extract_datetime", False),
+        "log_transform": body.get("log_transform", False),
+        "text_cleaning": body.get("text_cleaning", False),
     }
 
     all_changes: list[dict] = []
@@ -150,6 +153,22 @@ def download():
         download_name=f"{base}_cleaned.{ext}",
         mimetype="application/octet-stream",
     )
+
+# ---------- Visualization ----------
+@app.route("/api/visualize", methods=["GET"])
+def visualize():
+    session_id = request.args.get("session_id")
+    dtype = request.args.get("type", "raw") # "raw" or "cleaned"
+    
+    if not session_id or session_id not in SESSIONS:
+        return jsonify({"error": "Invalid session"}), 400
+
+    df = SESSIONS[session_id].get(dtype)
+    if df is None:
+        return jsonify({"error": f"No {dtype} data available."}), 400
+
+    vis_data = get_visualization_data(df)
+    return jsonify(vis_data)
 
 
 if __name__ == "__main__":
