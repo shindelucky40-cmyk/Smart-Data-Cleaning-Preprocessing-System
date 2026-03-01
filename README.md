@@ -144,7 +144,12 @@ Contributions, issues, and feature requests are welcome!
 5. Open a Pull Request
 
 ---
+## Author 
 
+   Lalit shinde 
+
+---
+   
 ## 📄 License
 
 This project is open source. Feel free to use and modify it.
