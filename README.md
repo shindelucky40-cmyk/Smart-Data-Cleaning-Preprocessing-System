@@ -13,6 +13,8 @@
 
 ### 🚀 [Live Demo → smart-data-cleaning-preprocessing-system-y2jw.onrender.com](https://smart-data-cleaning-preprocessing-system-y2jw.onrender.com)
 
+> ⚠️ Note: The app may take ~30–60 seconds to wake up on first load since it runs on Render's free tier (spins down during inactivity).
+
 </div>
 
 ---
